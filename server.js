@@ -6,9 +6,10 @@ const app = express();
 app.use(cors());
 
 // -------------------------------
-// لینک‌های سالم و تست‌شده
+// لیست کامل کانال‌ها (داخلی + خارجی + کانال‌های جدید شما)
 // -------------------------------
 const channels = {
+    // داخلی (psrv)
     "varzesh": "https://edge1.psrv.tv/live/varzesh/playlist.m3u8",
     "nasim": "https://edge1.psrv.tv/live/nasim/playlist.m3u8",
     "mostanad": "https://edge1.psrv.tv/live/mostanad/playlist.m3u8",
@@ -18,15 +19,18 @@ const channels = {
     "ifilm": "https://edge1.psrv.tv/live/ifilm/playlist.m3u8",
     "tamasha": "https://edge1.psrv.tv/live/tamasha/playlist.m3u8",
 
-    // خارجی
+    // خارجی قدیمی
     "dw": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
     "redbull": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
-    "euronews": "https://euronews-euronews-world-1-nl.samsung.wurl.tv/playlist.m3u8"
+    "euronews": "https://euronews-euronews-world-1-nl.samsung.wurl.tv/playlist.m3u8",
+
+    // کانال‌های جدید (درخواستی)
+    "123tv": "https://123tv-mx1.flex-cdn.net/index.m3u8",
+    "nlpo": "https://d3472rjicrodic.cloudfront.net/nlpo/clr-nlpo/709d5260/index.m3u8"
 };
 
-
 // -------------------------------
-// لیست کانال‌ها
+// دریافت لیست کانال‌ها
 // -------------------------------
 app.get("/api/channels", (req, res) => {
     res.json({
@@ -35,9 +39,8 @@ app.get("/api/channels", (req, res) => {
     });
 });
 
-
 // -------------------------------
-// پروکسی پخش HLS — نسخه سالم
+// پروکسی پخش HLS (نسخه‌ی سالم)
 // -------------------------------
 app.get("/api/watch/:id", async (req, res) => {
     const id = req.params.id;
@@ -68,11 +71,10 @@ app.get("/api/watch/:id", async (req, res) => {
     }
 });
 
-
+// -------------------------------
 app.get("/", (req, res) => {
     res.send("InternetTV Proxy Server is running OK ✔");
 });
-
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
