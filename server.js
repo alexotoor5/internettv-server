@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 
 // -------------------------------
-// لیست کامل کانال‌ها (داخلی + خارجی + کانال‌های جدید شما)
+// لیست کامل کانال‌ها
 // -------------------------------
 const channels = {
     // داخلی (psrv)
@@ -40,7 +40,7 @@ app.get("/api/channels", (req, res) => {
 });
 
 // -------------------------------
-// پروکسی پخش HLS (نسخه‌ی سالم)
+// پخش HLS با Rewrite لینک‌ها (نسخه حرفه‌ای)
 // -------------------------------
 app.get("/api/watch/:id", async (req, res) => {
     const id = req.params.id;
@@ -49,25 +49,35 @@ app.get("/api/watch/:id", async (req, res) => {
         return res.status(404).json({ error: "Channel not found" });
     }
 
-    try {
-        const url = channels[id];
+    const mainUrl = channels[id];
+    const baseUrl = mainUrl.substring(0, mainUrl.lastIndexOf("/") + 1);
 
-        const response = await axios({
-            url,
-            method: "GET",
-            responseType: "stream",
+    try {
+        const { data } = await axios.get(mainUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0",
-                "Accept": "*/*",
-                "Connection": "keep-alive"
+                "Accept": "*/*"
             }
         });
 
+        let text = data.toString();
+
+        // اصلاح لینک‌های نسبی در M3U8
+        text = text.replace(/URI="([^"]+)"/g, (match, url) => {
+            if (url.startsWith("http")) return match;
+            return `URI="${baseUrl}${url}"`;
+        });
+
+        text = text.replace(/^(?!#)(.*\.m3u8.*)$/gm, (line) => {
+            if (line.startsWith("http")) return line;
+            return baseUrl + line;
+        });
+
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-        response.data.pipe(res);
+        res.send(text);
 
     } catch (err) {
-        res.status(500).json({ error: "Stream error", detail: err.message });
+        res.status(500).json({ error: "Rewrite failed", detail: err.message });
     }
 });
 
