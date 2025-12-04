@@ -5,11 +5,10 @@ const cors = require("cors");
 const app = express();
 app.use(cors());
 
-// -------------------------------
-// لیست کامل کانال‌ها
-// -------------------------------
+// ------------------------------------------------
+// لیست کانال‌ها (قابل افزایش)
+// ------------------------------------------------
 const channels = {
-    // داخلی (psrv)
     "varzesh": "https://edge1.psrv.tv/live/varzesh/playlist.m3u8",
     "nasim": "https://edge1.psrv.tv/live/nasim/playlist.m3u8",
     "mostanad": "https://edge1.psrv.tv/live/mostanad/playlist.m3u8",
@@ -19,29 +18,29 @@ const channels = {
     "ifilm": "https://edge1.psrv.tv/live/ifilm/playlist.m3u8",
     "tamasha": "https://edge1.psrv.tv/live/tamasha/playlist.m3u8",
 
-    // خارجی
-    "dw": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
-    "redbull": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
-    "euronews": "https://euronews-euronews-world-1-nl.samsung.wurl.tv/playlist.m3u8",
+    // ParsianHD sample:
+    "khabar": "https://live2.parsianhd.ir/hls/khabar.m3u8",
 
-    // درخواستی
+    // خارجی
+    "nlpo": "https://d3472rjicrodic.cloudfront.net/nlpo/clr-nlpo/709d5260/index.m3u8",
     "123tv": "https://123tv-mx1.flex-cdn.net/index.m3u8",
-    "nlpo": "https://d3472rjicrodic.cloudfront.net/nlpo/clr-nlpo/709d5260/index.m3u8"
+    "dw": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8"
 };
 
-// -------------------------------
-// لیست کانال‌ها
-// -------------------------------
-app.get("/api/channels", (req, res) => {
-    res.json({
-        status: "ok",
-        list: Object.keys(channels)
-    });
-});
+// ------------------------------------------------
+// Headerهای مخصوص psrv / parsianhd (شبیه tv.garden)
+// ------------------------------------------------
+const proxyHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "*/*",
+    "Origin": "https://tv.garden",
+    "Referer": "https://tv.garden/",
+    "Connection": "keep-alive"
+};
 
-// -------------------------------
-// پخش HLS با Auto-Filter برای Android 7
-// -------------------------------
+// ------------------------------------------------
+// پخش HLS با فیلتر کیفیت + بازنویسی لینک‌ها + Header مخصوص
+// ------------------------------------------------
 app.get("/api/watch/:id", async (req, res) => {
     const id = req.params.id;
 
@@ -53,23 +52,20 @@ app.get("/api/watch/:id", async (req, res) => {
     const baseUrl = mainUrl.substring(0, mainUrl.lastIndexOf("/") + 1);
 
     try {
-        // دریافت Master Playlist اصلی
+        // دریافت Playlist اصلی
         const { data } = await axios.get(mainUrl, {
-            headers: {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "*/*"
-            }
+            headers: proxyHeaders
         });
 
         let text = data.toString();
 
-        // ------------------------------------
-        // 1) حذف کیفیت‌های ناسازگار Android 7
-        // ------------------------------------
+        // --------------------------------------------
+        // حذف کیفیت‌های ناسازگار اندروید 7
+        // --------------------------------------------
         text = text
             .split("\n")
             .filter(line => {
-                const badCodec = /(avc1\.64001f|avc1\.4d401f|avc1\.high)/i;
+                const badCodec = /(avc1\.64001f|avc1\.4d401f|hev1|hvc1)/i;
                 const highRes = /(720|1080|1440|2160)/;
 
                 if (badCodec.test(line)) return false;
@@ -79,9 +75,9 @@ app.get("/api/watch/:id", async (req, res) => {
             })
             .join("\n");
 
-        // ------------------------------------
-        // 2) اصلاح لینک‌های نسبی → absolute
-        // ------------------------------------
+        // --------------------------------------------
+        // بازنویسی لینک‌های نسبی → absolute URL
+        // --------------------------------------------
         text = text.replace(/URI="([^"]+)"/g, (m, p) => {
             if (p.startsWith("http")) return m;
             return `URI="${baseUrl}${p}"`;
@@ -92,21 +88,23 @@ app.get("/api/watch/:id", async (req, res) => {
             return baseUrl + line;
         });
 
-        // ------------------------------------
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
         res.send(text);
 
     } catch (err) {
-        res.status(500).json({ error: "Rewrite failed", detail: err.message });
+        res.status(500).json({
+            error: "Rewrite/Proxy error",
+            detail: err.message
+        });
     }
 });
 
-// -------------------------------
+// ------------------------------------------------
 app.get("/", (req, res) => {
-    res.send("InternetTV Proxy Server is running OK ✔");
+    res.send("InternetTV Premium Proxy Server ✔ Running");
 });
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log("Server running on port " + port);
+    console.log("Premium Proxy Server running on port " + port);
 });
