@@ -19,18 +19,18 @@ const channels = {
     "ifilm": "https://edge1.psrv.tv/live/ifilm/playlist.m3u8",
     "tamasha": "https://edge1.psrv.tv/live/tamasha/playlist.m3u8",
 
-    // خارجی قدیمی
+    // خارجی
     "dw": "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
     "redbull": "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
     "euronews": "https://euronews-euronews-world-1-nl.samsung.wurl.tv/playlist.m3u8",
 
-    // کانال‌های جدید (درخواستی)
+    // درخواستی
     "123tv": "https://123tv-mx1.flex-cdn.net/index.m3u8",
     "nlpo": "https://d3472rjicrodic.cloudfront.net/nlpo/clr-nlpo/709d5260/index.m3u8"
 };
 
 // -------------------------------
-// دریافت لیست کانال‌ها
+// لیست کانال‌ها
 // -------------------------------
 app.get("/api/channels", (req, res) => {
     res.json({
@@ -40,7 +40,7 @@ app.get("/api/channels", (req, res) => {
 });
 
 // -------------------------------
-// پخش HLS با Rewrite لینک‌ها (نسخه حرفه‌ای)
+// پخش HLS با Auto-Filter برای Android 7
 // -------------------------------
 app.get("/api/watch/:id", async (req, res) => {
     const id = req.params.id;
@@ -53,6 +53,7 @@ app.get("/api/watch/:id", async (req, res) => {
     const baseUrl = mainUrl.substring(0, mainUrl.lastIndexOf("/") + 1);
 
     try {
+        // دریافت Master Playlist اصلی
         const { data } = await axios.get(mainUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0",
@@ -62,17 +63,36 @@ app.get("/api/watch/:id", async (req, res) => {
 
         let text = data.toString();
 
-        // اصلاح لینک‌های نسبی در M3U8
-        text = text.replace(/URI="([^"]+)"/g, (match, url) => {
-            if (url.startsWith("http")) return match;
-            return `URI="${baseUrl}${url}"`;
+        // ------------------------------------
+        // 1) حذف کیفیت‌های ناسازگار Android 7
+        // ------------------------------------
+        text = text
+            .split("\n")
+            .filter(line => {
+                const badCodec = /(avc1\.64001f|avc1\.4d401f|avc1\.high)/i;
+                const highRes = /(720|1080|1440|2160)/;
+
+                if (badCodec.test(line)) return false;
+                if (highRes.test(line)) return false;
+
+                return true;
+            })
+            .join("\n");
+
+        // ------------------------------------
+        // 2) اصلاح لینک‌های نسبی → absolute
+        // ------------------------------------
+        text = text.replace(/URI="([^"]+)"/g, (m, p) => {
+            if (p.startsWith("http")) return m;
+            return `URI="${baseUrl}${p}"`;
         });
 
-        text = text.replace(/^(?!#)(.*\.m3u8.*)$/gm, (line) => {
+        text = text.replace(/^(?!#)(.*\.m3u8.*)$/gm, line => {
             if (line.startsWith("http")) return line;
             return baseUrl + line;
         });
 
+        // ------------------------------------
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
         res.send(text);
 
